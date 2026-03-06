@@ -88,35 +88,42 @@ function getDefaultNames(gender, favored) {
   return names.slice(0, 6)
 }
 
-// Call Moligan AI (timeout protected)
-async function callAI(prompt) {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 8000)
-  
-  try {
-    const response = await fetch(moliganUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${moliganKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: moliganModel,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.8,
-        max_tokens: 800
-      }),
-      signal: controller.signal
-    })
-    clearTimeout(timeout)
-    
-    const data = await response.json()
-    return data.choices?.[0]?.message?.content || ''
-  } catch (e) {
-    clearTimeout(timeout)
-    console.error('AI call error:', e.message)
-    return ''
+// Call Moligan AI (with retry)
+async function callAI(prompt, retries = 2) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 25000)
+      
+      const response = await fetch(moliganUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${moliganKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: moliganModel,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.8,
+          max_tokens: 1000
+        }),
+        signal: controller.signal
+      })
+      clearTimeout(timeout)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      
+      const data = await response.json()
+      return data.choices?.[0]?.message?.content || ''
+    } catch (e) {
+      console.error(`AI call attempt ${i + 1} failed:`, e.message)
+      if (i === retries - 1) return ''
+      await new Promise(r => setTimeout(r, 1000))
+    }
   }
+  return ''
 }
 
 // Parse names from AI response
@@ -170,7 +177,7 @@ export async function POST(request) {
     // Generate names
     let names = []
     
-    // Try AI first
+    // Try AI (no fallback)
     if (baziData) {
       const chart = baziData.chart
       const genderText = gender === 'male' ? '男性' : gender === 'female' ? '女性' : '中性'
@@ -185,13 +192,16 @@ export async function POST(request) {
 
 请用JSON数组格式输出，只输出JSON，不要其他内容。`
 
-      const aiResponse = await callAI(prompt)
-      names = parseNames(aiResponse)
+      names = await callAI(prompt)
+      names = parseNames(names)
     }
     
-    // Fallback to default names
+    // If still no names, return error
     if (!names.length) {
-      names = getDefaultNames(gender, favored)
+      return NextResponse.json(
+        { error: 'AI生成失败，请稍后重试' },
+        { status: 500 }
+      )
     }
     
     // Add surname if provided
