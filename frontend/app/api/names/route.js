@@ -74,7 +74,7 @@ async function callAI(prompt) {
         model: moliganModel,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.8,
-        max_tokens: 2000
+        max_tokens: 1000
       })
     })
     const data = await response.json()
