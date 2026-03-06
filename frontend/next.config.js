@@ -5,7 +5,14 @@ const nextConfig = {
   
   // Environment variables
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://yiname-api.onrender.com/api/v1',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '',
+  },
+  
+  // Vercel serverless function config
+  api: {
+    bodyParser: {
+      sizeLimit: '1mb',
+    },
   },
   
   // Redirects

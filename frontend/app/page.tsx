@@ -28,7 +28,7 @@ import {
 import { FaYinYang, FaUser, FaBaby, FaBuilding, FaMagic, FaHistory } from 'react-icons/fa'
 import axios from 'axios'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/names'
 
 interface GeneratedName {
   name: string
