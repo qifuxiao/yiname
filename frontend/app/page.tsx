@@ -92,7 +92,7 @@ export default function Home() {
         birthHour = timeMap[formData.birthTime]
       }
       
-      const response = await axios.post(`${API_URL}/names/generate`, {
+      const response = await axios.post(`${API_URL}`, {
         name_type: formData.nameType,
         gender: formData.gender || null,
         birth_date: formData.birthDate,
