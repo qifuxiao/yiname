@@ -1,29 +1,29 @@
-// Vercel API Routes for YiName
-// 部署到 Vercel 后自动生效
+// YiName API with User Auth and Payment
+// Now uses Supabase for authentication
 
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
-// Environment variables
-const moliganUrl = process.env.MOLIGAN_URL || 'https://ai.gitee.com/v1/chat/completions'
-const moliganKey = process.env.MOLIGAN_API_KEY || 'BSHFXVVPPOBWOPSLKPTBXHATPABANWF0EOO7HB10'
-const moliganModel = process.env.MOLIGAN_MODEL || 'Qwen3.5-27B'
+// Supabase config
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
 
-// ============ Utils ============
+// Payment config
+const PAYMENT_PRICE = 9.9 // RMB
+const PAYMENT_QR_URL = 'https://your-domain.com/payment-qr.jpg' // 你的收款码
 
-// BaZi calculation (simplified)
+// ============ BaZi Utils ============
+
 function calculateBaZi(birthDate, birthHour = 12) {
   const year = birthDate.getFullYear()
   const month = birthDate.getMonth() + 1
   const day = birthDate.getDate()
   
-  // Heavenly Stems
   const stems = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸']
-  // Earthly Branches
   const branches = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥']
-  // Elements
   const elements = { '甲': '木', '乙': '木', '丙': '火', '丁': '火', '戊': '土', '己': '土', '庚': '金', '辛': '金', '壬': '水', '癸': '水' }
   
-  // Simplified calculation
   const yearStem = stems[(year - 1984) % 10]
   const yearBranch = branches[(year - 1984) % 12]
   const monthStem = stems[((year - 1984) * 2 + month) % 10]
@@ -33,7 +33,6 @@ function calculateBaZi(birthDate, birthHour = 12) {
   const hourBranch = branches[Math.floor((birthHour + 1) / 2) % 12]
   const hourStem = stems[((year - 1984) * 2 + Math.floor((birthHour + 1) / 2)) % 10]
   
-  // Calculate five elements
   const wuxingCounts = { '木': 0, '火': 0, '土': 0, '金': 0, '水': 0 }
   const stemElements = [yearStem, monthStem, dayStem, hourStem]
   stemElements.forEach(s => { if (elements[s]) wuxingCounts[elements[s]]++ })
@@ -56,40 +55,11 @@ function calculateBaZi(birthDate, birthHour = 12) {
   }
 }
 
-// Default names based on gender
-function getDefaultNames(gender, favored) {
-  const maleNames = [
-    { name: '浩然', pinyin: 'hào rán', wuxing: '水', meaning: '浩然正气，胸怀宽广，气度不凡', score: 92 },
-    { name: '子墨', pinyin: 'zǐ mò', wuxing: '木', meaning: '文雅大方，才华横溢，品德高尚', score: 88 },
-    { name: '明轩', pinyin: 'míng xuān', wuxing: '火', meaning: '光明磊落，气宇轩昂，前途似锦', score: 90 },
-    { name: '雨泽', pinyin: 'yǔ zé', wuxing: '水', meaning: '恩泽广布，心地善良，福缘深厚', score: 87 },
-    { name: '思远', pinyin: 'sī yuǎn', wuxing: '土', meaning: '深思熟虑，远见卓识，志向远大', score: 89 },
-    { name: '梓涵', pinyin: 'zǐ hán', wuxing: '木', meaning: '生机勃勃，胸怀宽广，才德兼备', score: 91 },
-    { name: '晨熙', pinyin: 'chén xī', wuxing: '火', meaning: '晨光熙暖，朝气蓬勃，前程似锦', score: 88 },
-    { name: '铭哲', pinyin: 'míng zhé', wuxing: '金', meaning: '铭记于心，哲思明智，聪慧过人', score: 86 },
-  ]
-  
-  const femaleNames = [
-    { name: '诗涵', pinyin: 'shī hán', wuxing: '水', meaning: '诗情画意，内涵丰富，温婉可人', score: 91 },
-    { name: '雨萱', pinyin: 'yǔ xuān', wuxing: '木', meaning: '雨露滋润，聪明伶俐，活泼可爱', score: 89 },
-    { name: '思琪', pinyin: 'sī qí', wuxing: '金', meaning: '思念如琪，美丽大方，气质优雅', score: 88 },
-    { name: '雅婷', pinyin: 'yǎ tíng', wuxing: '火', meaning: '雅致清新，婷婷玉立，温柔贤惠', score: 87 },
-    { name: '欣悦', pinyin: 'xīn yuè', wuxing: '金', meaning: '欣喜愉悦，乐观开朗，幸福美满', score: 90 },
-    { name: '梦琪', pinyin: 'mèng qí', wuxing: '木', meaning: '梦回千年，琪花瑶草，才情横溢', score: 86 },
-    { name: '子晴', pinyin: 'zǐ qíng', wuxing: '火', meaning: '子时之晴，阳光灿烂，积极向上', score: 85 },
-    { name: '嘉怡', pinyin: 'jiā yí', wuxing: '土', meaning: '嘉言懿行，怡然自得，温柔善良', score: 88 },
-  ]
-  
-  // 优先选择五行匹配的名字
-  const wuxingMap = { '木': 0, '火': 1, '土': 2, '金': 3, '水': 4 }
-  const wuxingOrder = [favored]
-  
-  const names = gender === 'female' ? femaleNames : maleNames
-  return names.slice(0, 6)
-}
-
-// Call Moligan AI (with retry)
 async function callAI(prompt, retries = 2) {
+  const moliganUrl = process.env.MOLIGAN_URL || 'https://ai.gitee.com/v1/chat/completions'
+  const moliganKey = process.env.MOLIGAN_API_KEY || 'BSHFXVVPPOBWOPSLKPTBXHATPABANWF0EOO7HB10'
+  const moliganModel = process.env.MOLIGAN_MODEL || 'Qwen3.5-27B'
+  
   for (let i = 0; i < retries; i++) {
     try {
       const controller = new AbortController()
@@ -111,14 +81,11 @@ async function callAI(prompt, retries = 2) {
       })
       clearTimeout(timeout)
       
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
-      
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json()
       return data.choices?.[0]?.message?.content || ''
     } catch (e) {
-      console.error(`AI call attempt ${i + 1} failed:`, e.message)
+      console.error(`AI call failed:`, e.message)
       if (i === retries - 1) return ''
       await new Promise(r => setTimeout(r, 1000))
     }
@@ -126,42 +93,110 @@ async function callAI(prompt, retries = 2) {
   return ''
 }
 
-// Parse names from AI response
 function parseNames(text) {
   try {
     const jsonMatch = text.match(/\[[\s\S]*\]/)
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0])
-    }
+    if (jsonMatch) return JSON.parse(jsonMatch[0])
     return []
-  } catch (e) {
-    return []
+  } catch (e) { return [] }
+}
+
+// ============ Auth Helpers ============
+
+async function getUserFromRequest(request) {
+  const authHeader = request.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) return null
+  
+  const token = authHeader.replace('Bearer ', '')
+  
+  if (!supabase) {
+    // No Supabase - use simple token validation
+    return { id: token, email: 'demo@yiname.app' }
+  }
+  
+  const { data: { user }, error } = await supabase.auth.getUser(token)
+  if (error || !user) return null
+  
+  return user
+}
+
+async function checkUserPayment(userId) {
+  if (!supabase) return { can_use: true, remaining: 999 }
+  
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .single()
+  
+  if (!profile) {
+    // New user - give 1 free try
+    return { can_use: true, remaining: 1, is_trial: true }
+  }
+  
+  return {
+    can_use: profile.remaining_tries > 0,
+    remaining: profile.remaining_tries,
+    is_trial: profile.is_trial
+  }
+}
+
+async function decrementTries(userId) {
+  if (!supabase) return
+  
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .single()
+  
+  if (!profile) {
+    // Create new profile
+    await supabase.from('user_profiles').insert({
+      user_id: userId,
+      remaining_tries: 0,
+      is_trial: false
+    })
+  } else {
+    // Decrement
+    await supabase
+      .from('user_profiles')
+      .update({ remaining_tries: Math.max(0, profile.remaining_tries - 1) })
+      .eq('user_id', userId)
   }
 }
 
 // ============ API Routes ============
 
 // Health check
-export async function GET() {
+export async function GET(request) {
   return NextResponse.json({
     status: 'ok',
-    message: 'YiName API is running',
-    version: '1.0.0'
+    version: '2.0.0',
+    auth: !!supabase
   })
 }
 
-// Generate names
+// Main API - Generate names
 export async function POST(request) {
   try {
+    // Get user
+    const user = await getUserFromRequest(request)
+    
+    // Check payment/quota
+    const payment = await checkUserPayment(user?.id || 'anonymous')
+    
+    if (!payment.can_use) {
+      return NextResponse.json({
+        error: 'NO_QUOTA',
+        message: '您的免费次数已用完，请先充值',
+        remaining: 0,
+        price: PAYMENT_PRICE
+      }, { status: 402 })
+    }
+    
     const body = await request.json()
-    const { 
-      birth_date, 
-      birth_hour, 
-      gender, 
-      surname, 
-      style, 
-      count 
-    } = body
+    const { birth_date, birth_hour, gender, surname, style, count } = body
     
     // Calculate BaZi
     let baziData = null
@@ -177,7 +212,6 @@ export async function POST(request) {
     // Generate names
     let names = []
     
-    // Try AI (no fallback)
     if (baziData) {
       const chart = baziData.chart
       const genderText = gender === 'male' ? '男性' : gender === 'female' ? '女性' : '中性'
@@ -196,7 +230,6 @@ export async function POST(request) {
       names = parseNames(names)
     }
     
-    // If still no names, return error
     if (!names.length) {
       return NextResponse.json(
         { error: 'AI生成失败，请稍后重试' },
@@ -204,18 +237,19 @@ export async function POST(request) {
       )
     }
     
-    // Add surname if provided
+    // Add surname
     if (surname && names.length > 0) {
-      names = names.map(n => ({
-        ...n,
-        name: surname + n.name
-      }))
+      names = names.map(n => ({ ...n, name: surname + n.name }))
     }
+    
+    // Decrement tries
+    await decrementTries(user?.id || 'anonymous')
     
     return NextResponse.json({
       names,
       bazi_chart: baziData?.chart || {},
-      wuxing_analysis: baziData?.wuxing || {}
+      wuxing_analysis: baziData?.wuxing || {},
+      remaining: payment.remaining - 1
     })
     
   } catch (error) {
