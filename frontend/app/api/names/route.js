@@ -56,9 +56,9 @@ function calculateBaZi(birthDate, birthHour = 12) {
 }
 
 async function callAI(prompt, retries = 2) {
-  const moliganUrl = process.env.MOLIGAN_URL || 'https://ai.gitee.com/v1/chat/completions'
-  const moliganKey = process.env.MOLIGAN_API_KEY || 'BSHFXVVPPOBWOPSLKPTBXHATPABANWF0EOO7HB10'
-  const moliganModel = process.env.MOLIGAN_MODEL || 'Qwen3.5-27B'
+  const moliganUrl = process.env.MOLIGAN_URL || 'https://api.lkeap.cloud.tencent.com/coding/v3/chat/completions'
+  const moliganKey = process.env.MOLIGAN_API_KEY || 'sk-sp-DvdNe2fyNJJ0'
+  const moliganModel = process.env.MOLIGAN_MODEL || 'hunyuan-2.0-instruct'
   
   for (let i = 0; i < retries; i++) {
     try {
