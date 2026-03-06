@@ -1,0 +1,36 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Run tests
+        working-directory: backend
+        run: |
+          # Add test commands here
+          echo "Running tests..."
+      
+      - name: Deploy to Render
+        uses: render-deploy/action@v1
+        with:
+          render-service-token: ${{ secrets.RENDER_SERVICE_TOKEN }}
+          service-id: ${{ secrets.RENDER_BACKEND_SERVICE_ID }}
